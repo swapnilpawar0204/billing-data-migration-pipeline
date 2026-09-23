@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# Env / secrets
+.env
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Data artifacts (keep sample data, ignore generated output)
+data/rejected_records.json
+*.log
+
+docker-build-error.txt
