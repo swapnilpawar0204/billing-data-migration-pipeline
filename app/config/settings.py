@@ -16,7 +16,10 @@ class Settings(BaseSettings):
 
     app_env: str = Field(default="development", alias="APP_ENV")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
-    api_base_url: str = Field(default="http://localhost:8000", alias="API_BASE_URL")
+    api_base_url: str = Field(
+        default="https://example.com/api/billing",
+        alias="API_BASE_URL",
+    )
     api_key: str = Field(default="", alias="API_KEY")
     mysql_host: str = Field(default="localhost", alias="MYSQL_HOST")
     mysql_port: int = Field(default=3306, alias="MYSQL_PORT")
