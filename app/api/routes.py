@@ -20,6 +20,7 @@ from app.migration.migration_service import (
     MigrationError,
     run_migration_flow,
 )
+from app.monitoring.health import check_database
 from app.transformation.transformer import transform_transactions
 from app.validation.validators import ValidationResult, validate_transactions
 
@@ -47,9 +48,16 @@ def _validation_response(
 
 @router.get("/health", summary="Check application health")
 async def health_check() -> dict[str, str]:
-    """Return the application health status for Phase 2."""
+    """Return application and database health status."""
+    if not check_database():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database service is unavailable",
+        )
+
     return {
         "status": "healthy",
+        "database": "healthy",
         "environment": settings.app_env,
     }
 
