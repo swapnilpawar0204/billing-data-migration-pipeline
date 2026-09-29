@@ -10,7 +10,10 @@ from app.ingestion.schemas import BillingTransactionSchema
 class TransactionBatchRequest(BaseModel):
     """A batch of raw transaction records awaiting validation."""
 
-    transactions: list[dict[str, Any]] = Field(min_length=0)
+    transactions: list[dict[str, Any]] = Field(
+        min_length=0,
+        max_length=1000,
+    )
 
 
 class RejectedRecordResponse(BaseModel):
