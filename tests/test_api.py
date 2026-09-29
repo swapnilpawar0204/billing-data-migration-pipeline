@@ -4,6 +4,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
+from app.api import routes
 from app.config.settings import settings
 from app.database.connection import Base, get_db
 from app.main import app
@@ -44,26 +45,40 @@ def test_application_imports() -> None:
     assert app is not None
 
 
-def test_health_endpoint_returns_200() -> None:
+def test_health_endpoint_returns_200(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(routes, "check_database", lambda: True)
+
     response = client.get("/health")
+
     assert response.status_code == 200
 
 
-def test_health_response_contains_status() -> None:
+def test_health_response_contains_status(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(routes, "check_database", lambda: True)
+
     response = client.get("/health")
     payload = response.json()
+
     assert "status" in payload
 
 
-def test_health_status_is_healthy() -> None:
+def test_health_status_is_healthy(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(routes, "check_database", lambda: True)
+
     response = client.get("/health")
     payload = response.json()
+
     assert payload["status"] == "healthy"
 
 
-def test_health_response_contains_environment() -> None:
+def test_health_response_contains_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(routes, "check_database", lambda: True)
+
     response = client.get("/health")
     payload = response.json()
+
     assert "environment" in payload
     assert payload["environment"] == settings.app_env
 
