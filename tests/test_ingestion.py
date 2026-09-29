@@ -40,6 +40,17 @@ def test_fetch_transactions_returns_validated_transactions() -> None:
     client.close()
 
 
+def test_build_headers_includes_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "app.ingestion.api_client.settings.api_key",
+        "test-api-key",
+    )
+
+    headers = BillingAPIClient._build_headers()
+
+    assert headers == {"Authorization": "Bearer test-api-key"}
+
+
 def test_fetch_transactions_raises_for_http_error() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(503)
