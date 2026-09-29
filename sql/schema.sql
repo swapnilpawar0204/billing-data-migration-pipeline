@@ -1,1 +1,0 @@
--- schema.sql: customers, billing_transactions, migration_errors, migration_runs (Phase 3)
