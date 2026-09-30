@@ -1,456 +1,711 @@
-﻿# \# Billing Data Migration Pipeline
+# Billing Data Migration Pipeline
+
+A containerized billing-data migration pipeline built with **Python, FastAPI, MySQL, SQLAlchemy, Docker, and GitHub Actions**.
+
+The project demonstrates reliable data ingestion, validation, transformation, database migration, idempotency, reconciliation, automated testing, containerization, and CI automation.
+
+---
+
+## Project Status
+
+| Component                        | Status             |
+| -------------------------------- | ------------------ |
+| Core migration pipeline          | ✅ Complete         |
+| REST API                         | ✅ Complete         |
+| Data validation & transformation | ✅ Complete         |
+| MySQL database integration       | ✅ Complete         |
+| Idempotent migration             | ✅ Complete         |
+| Migration reconciliation         | ✅ Complete         |
+| Automated tests                  | ✅ Complete         |
+| Docker & Docker Compose          | ✅ Complete         |
+| GitHub Actions CI                | ✅ Complete         |
+| Azure deployment                 | ⏳ Not implemented  |
+| Terraform infrastructure         | ⏳ Preparation only |
+| Production cloud deployment      | ⏳ Planned          |
+
+> **Note:** Azure deployment, production cloud infrastructure, and production CD are intentionally not presented as completed features.
+
+---
+
+## Overview
+
+The pipeline processes billing transactions received through a REST API and safely migrates them into a MySQL database.
+
+### Data Flow
+
+```text
+                 External REST API
+                        │
+                        ▼
+                Data Ingestion
+                        │
+                        ▼
+                 Input Validation
+                        │
+                        ▼
+             Data Transformation
+                        │
+                        ▼
+              Duplicate Detection
+                        │
+                        ▼
+              Database Migration
+                        │
+                        ▼
+                 Reconciliation
+                        │
+                        ▼
+                     MySQL
+```
+
+The system is designed to prevent duplicate migrations, validate incoming data, handle database failures safely, and verify that migrated records match the expected result.
+
+---
+
+## Key Features
+
+### API & Data Processing
+
+* REST API built with FastAPI
+* HTTPX-based external API ingestion
+* Pydantic request validation
+* Data normalization and transformation
+* Structured API error handling
+* Batch processing support
+
+### Database & Migration
+
+* MySQL 8 database
+* SQLAlchemy ORM
+* Transaction-based database operations
+* Rollback on migration failure
+* Duplicate detection
+* Idempotent migration using `external_transaction_id`
+* Migration status lookup
+* Migration reconciliation
+
+### Reliability
+
+* Input validation before database operations
+* Idempotent processing
+* Duplicate protection
+* Database transaction handling
+* Rollback handling
+* Health checks
+* Automated test coverage
+* Failure-path testing
+
+### DevOps & Cloud-Oriented Engineering
+
+* Docker containerization
+* Docker Compose multi-container environment
+* Non-root application container
+* Environment-based configuration
+* GitHub Actions CI
+* Ruff code-quality checks
+* Black formatting checks
+* Python compilation checks
+* Docker image build verification
+* Terraform infrastructure preparation
+
+### Security Practices
+
+* Environment variables for configuration
+* `.env.example` provided for local setup
+* No credentials committed to the repository
+* Non-root Docker container
+* Separation of configuration from application code
+
+---
+
+## Technology Stack
+
+| Category                   | Technology             |
+| -------------------------- | ---------------------- |
+| Language                   | Python 3.13            |
+| API Framework              | FastAPI                |
+| Data Validation            | Pydantic               |
+| Database                   | MySQL 8                |
+| ORM                        | SQLAlchemy             |
+| HTTP Client                | HTTPX                  |
+| Testing                    | pytest                 |
+| Code Quality               | Ruff, Black            |
+| Containerization           | Docker, Docker Compose |
+| CI                         | GitHub Actions         |
+| Version Control            | Git, GitHub            |
+| Infrastructure Preparation | Terraform              |
+
+---
+
+## Project Structure
+
+```text
+billing-data-migration-pipeline/
+│
+├── app/
+│   ├── api/
+│   │   └── routes/
+│   │
+│   ├── config/
+│   │
+│   ├── database/
+│   │
+│   ├── ingestion/
+│   │
+│   ├── validation/
+│   │
+│   ├── transformation/
+│   │
+│   ├── migration/
+│   │
+│   ├── reconciliation/
+│   │
+│   ├── monitoring/
+│   │
+│   └── utils/
+│
+├── tests/
+│
+├── scripts/
+│
+├── sql/
+│
+├── docker/
+│
+├── terraform/
+│
+├── .github/
+│   └── workflows/
+│       └── ci.yml
+│
+├── docker-compose.yml
+├── requirements.txt
+├── .env.example
+└── README.md
+```
+
+---
+
+## Database
+
+### Main Table
+
+```text
+billing_transactions
+```
+
+### Important Fields
+
+| Field                     | Purpose                                             |
+| ------------------------- | --------------------------------------------------- |
+| `external_transaction_id` | External transaction identifier and idempotency key |
+| `customer_id`             | Customer identifier                                 |
+| `invoice_id`              | Invoice identifier                                  |
+| `amount`                  | Billing amount                                      |
+| `currency`                | Transaction currency                                |
+| `status`                  | Transaction status                                  |
+| `transaction_date`        | Transaction date                                    |
+| `source_system`           | Originating system                                  |
+| `created_at`              | Record creation timestamp                           |
+| `updated_at`              | Last update timestamp                               |
+
+### Idempotency
+
+The `external_transaction_id` is used as the idempotency key.
+
+This prevents the same external transaction from being migrated multiple times.
+
+Example:
+
+```text
+External Transaction
+        │
+        ▼
+Check external_transaction_id
+        │
+        ├── Already exists ──► Return existing migration
+        │
+        └── Does not exist ──► Perform migration
+```
+
+---
+
+## Reliability Design
+
+The migration workflow follows several reliability principles:
+
+```text
+Request
+   │
+   ▼
+Validate Input
+   │
+   ▼
+Transform Data
+   │
+   ▼
+Check Duplicate
+   │
+   ▼
+Start Database Transaction
+   │
+   ▼
+Insert Migration Record
+   │
+   ├── Success ──► Commit
+   │
+   └── Failure ──► Rollback
+                         │
+                         ▼
+                   Return Error
+   │
+   ▼
+Reconcile Result
+```
+
+### Reliability mechanisms
+
+* Input validation
+* Duplicate detection
+* Idempotent processing
+* Database transactions
+* Rollback on failure
+* Reconciliation
+* Health checks
+* Automated failure testing
+* Containerized execution
+
+---
+
+## Testing
+
+The project uses **pytest** for automated testing.
+
+Current test status:
+
+```text
+61 tests passed
+```
+
+Run the test suite:
+
+```bash
+pytest -v
+```
+
+### Code Quality
+
+Run Ruff:
+
+```bash
+ruff check .
+```
+
+Run Black verification:
+
+```bash
+black --check .
+```
+
+Run Python compilation checks:
+
+```bash
+python -m compileall app tests
+```
+
+---
+
+## Running Locally
+
+### Prerequisites
 
-# 
+Install:
+
+* Python 3.13+
+* Docker Desktop
+* Git
+
+Optional for local development:
+
+* MySQL 8
+* VS Code / IntelliJ / PyCharm
+
+---
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/swapnilpawar0204/billing-data-migration-pipeline.git
+```
+
+Move into the project:
+
+```bash
+cd billing-data-migration-pipeline
+```
+
+---
+
+### 2. Create Environment Configuration
+
+Copy the example environment file:
+
+```bash
+cp .env.example .env
+```
+
+On Windows PowerShell:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Update the values in `.env` according to your local environment.
+
+> Do not commit `.env` or real credentials to Git.
+
+---
 
-# > A containerized ETL and data migration pipeline built with Python, FastAPI, MySQL, SQLAlchemy, Docker, and GitHub Actions.
+## Running with Docker Compose
 
-# 
+Build and start the application:
 
-# \## Project Status
+```bash
+docker compose up --build
+```
 
-# 
+Run in detached mode:
 
-# \* Core pipeline: Complete
+```bash
+docker compose up --build -d
+```
 
-# \* Tests: 61 passed
+Check running containers:
 
-# \* Docker + Docker Compose: Complete
+```bash
+docker compose ps
+```
 
-# \* GitHub Actions CI: Complete
+View application logs:
+
+```bash
+docker compose logs app
+```
+
+Follow application logs:
+
+```bash
+docker compose logs -f app
+```
+
+Stop the application:
+
+```bash
+docker compose down
+```
+
+Stop containers and remove volumes:
+
+```bash
+docker compose down -v
+```
+
+---
+
+## API
 
-# \* Azure deployment: Not implemented
+The application provides REST endpoints for billing-data ingestion and migration operations.
+
+Typical workflow:
+
+```text
+POST billing data
+        │
+        ▼
+Validate request
+        │
+        ▼
+Transform data
+        │
+        ▼
+Migrate to MySQL
+        │
+        ▼
+Check migration status
+        │
+        ▼
+Reconcile result
+```
 
-# \* Terraform: Preparation only
+### API Documentation
 
-# \* Production cloud deployment: Planned
+When the FastAPI application is running, interactive API documentation is available through:
 
-# 
+```text
+http://localhost:8000/docs
+```
 
-# \## Overview
+OpenAPI documentation:
 
-# 
+```text
+http://localhost:8000/openapi.json
+```
 
-# This project demonstrates a reliable billing-data migration workflow:
+---
 
-# 
+## Health Check
 
-# ```text
+The application exposes a health endpoint for basic service availability checks.
 
-# External REST API
+Example:
 
-# &#x20;      ↓
+```text
+GET /health
+```
 
-# Data Ingestion
+This can be used by Docker and operational tooling to verify application availability.
 
-# &#x20;      ↓
+---
 
-# Validation
+## GitHub Actions CI
 
-# &#x20;      ↓
+The repository includes a GitHub Actions workflow:
 
-# Transformation
+```text
+.github/
+└── workflows/
+    └── ci.yml
+```
 
-# &#x20;      ↓
+The CI workflow performs automated checks including:
 
-# Database Migration
+```text
+Git Push / Pull Request
+        │
+        ▼
+Install Dependencies
+        │
+        ▼
+Ruff
+        │
+        ▼
+Black
+        │
+        ▼
+Python Compilation
+        │
+        ▼
+pytest
+        │
+        ▼
+Docker Image Build
+```
 
-# &#x20;      ↓
+The current workflow is **CI only**.
 
-# Reconciliation
+It does not automatically deploy the application to Azure or another production cloud environment.
 
-# &#x20;      ↓
+---
 
-# MySQL
+## Docker
 
-# ```
+The application is containerized using Docker.
 
-# 
+The Docker setup includes:
 
-# The pipeline validates billing records, transforms data into a consistent format, migrates records safely, prevents duplicate migrations, and verifies the migration result.
+* Application container
+* MySQL container
+* Docker Compose orchestration
+* Environment-based configuration
+* Health checks
+* Non-root application execution
+* Persistent database volume
 
-# 
+Example:
 
-# \## Key Features
+```bash
+docker compose up --build
+```
 
-# 
+---
 
-# \* REST API ingestion using HTTPX
+## Infrastructure / Terraform
 
-# \* FastAPI backend
+The repository contains a `terraform/` directory for future infrastructure work.
 
-# \* Pydantic validation
+Current status:
 
-# \* Data transformation and normalization
+```text
+Terraform
+   │
+   ├── Repository structure: Present
+   ├── Infrastructure preparation: Present
+   └── Production infrastructure deployment: Not implemented
+```
 
-# \* MySQL database with SQLAlchemy
+Terraform is therefore treated as **infrastructure preparation**, not as completed cloud infrastructure.
 
-# \* Idempotent migration using `external\_transaction\_id`
+---
 
-# \* Duplicate detection
+## Cloud Roadmap
 
-# \* Transaction rollback on database failures
+The project is structured so that it can be extended into a cloud-based deployment.
 
-# \* Migration reconciliation
+Planned cloud work:
 
-# \* Structured error handling
+### Phase 1 — Azure Deployment
 
-# \* Automated tests with pytest
+Deploy the application to Azure using appropriate managed services.
 
-# \* Code quality checks with Ruff and Black
+### Phase 2 — Infrastructure as Code
 
-# \* Docker and Docker Compose
+Expand Terraform configuration to manage the required cloud resources.
 
-# \* GitHub Actions CI
+### Phase 3 — Cloud Database
 
-# \* Non-root Docker container
+Move the database from local Docker/MySQL to an appropriate managed cloud database.
 
-# \* Environment-based configuration
+### Phase 4 — Monitoring
 
-# \* No credentials committed to Git
+Add application and infrastructure monitoring, metrics, logs, and alerts.
 
-# 
+### Phase 5 — Production CD
 
-# \## Technology Stack
+Extend GitHub Actions from CI to a controlled production deployment workflow.
 
-# 
+### Phase 6 — Security Hardening
 
-# | Category         | Technology             |
+Introduce additional production security controls such as:
 
-# | ---------------- | ---------------------- |
+* API authentication
+* Authorization
+* Secret management
+* Network restrictions
+* Additional container hardening
 
-# | Language         | Python 3.12+           |
+---
 
-# | API              | FastAPI                |
+## Future Improvements
 
-# | Validation       | Pydantic               |
+Planned improvements include:
 
-# | Database         | MySQL 8                |
+* Alembic database migrations
+* API authentication and authorization
+* Application metrics
+* Structured production logging
+* Azure deployment
+* Terraform-managed infrastructure
+* Managed cloud database
+* Production CD workflow
+* Additional security hardening
+* Monitoring and alerting
 
-# | ORM              | SQLAlchemy             |
+---
 
-# | HTTP Client      | HTTPX                  |
+## Engineering Concepts Demonstrated
 
-# | Testing          | pytest                 |
+This project demonstrates practical backend, data-engineering, and cloud/SRE concepts:
 
-# | Code Quality     | Ruff, Black            |
+### Backend
 
-# | Containerization | Docker, Docker Compose |
+* REST API development
+* FastAPI
+* Pydantic
+* SQLAlchemy
+* MySQL
+* HTTPX
 
-# | CI               | GitHub Actions         |
+### Data Engineering
 
-# | Version Control  | Git, GitHub            |
+* Data ingestion
+* Data validation
+* Data transformation
+* Data normalization
+* Database migration
+* Reconciliation
 
-# | IaC Preparation  | Terraform              |
+### Reliability Engineering
 
-# 
+* Idempotency
+* Duplicate prevention
+* Transaction management
+* Rollback handling
+* Health checks
+* Failure-path testing
+* Automated testing
 
-# \## Project Structure
+### DevOps
 
-# 
+* Docker
+* Docker Compose
+* Git
+* GitHub Actions
+* CI automation
+* Code-quality automation
 
-# ```text
+### Infrastructure
 
-# billing-data-migration-pipeline/
+* Terraform preparation
+* Cloud deployment planning
+* Environment-based configuration
 
-# │
+---
 
-# ├── app/
+## What This Project Does Not Claim
 
-# │   ├── api/
+To keep the project technically accurate, the following are **not presented as completed features**:
 
-# │   ├── config/
+* Production Azure deployment
+* Production cloud infrastructure
+* Production managed database
+* Production monitoring/alerting
+* Production continuous deployment
+* Full production authentication/authorization
 
-# │   ├── database/
+These are planned extensions of the project.
 
-# │   ├── ingestion/
+---
 
-# │   ├── validation/
+## Project Goal
 
-# │   ├── transformation/
+The goal of this project is to demonstrate how a billing-data migration service can be designed with reliability and operational considerations from the beginning.
 
-# │   ├── migration/
+The project combines:
 
-# │   ├── reconciliation/
+```text
+FastAPI
+   +
+Data Validation
+   +
+ETL-style Processing
+   +
+MySQL
+   +
+Idempotent Migration
+   +
+Transaction Management
+   +
+Reconciliation
+   +
+Automated Testing
+   +
+Docker
+   +
+GitHub Actions
+   +
+Infrastructure Preparation
+```
 
-# │   ├── monitoring/
+This provides a practical foundation for further development toward a cloud-deployed data migration service.
 
-# │   └── utils/
+---
 
-# │
+## Author
 
-# ├── tests/
+**Swapnil Pawar**
 
-# ├── scripts/
+BCA Graduate | Cloud & DevOps / SRE
 
-# ├── sql/
+GitHub: `https://github.com/swapnilpawar0204`
 
-# ├── docker/
-
-# ├── terraform/
-
-# ├── .github/
-
-# │   └── workflows/
-
-# │       └── ci.yml
-
-# ├── docker-compose.yml
-
-# ├── requirements.txt
-
-# ├── .env.example
-
-# └── README.md
-
-# ```
-
-# 
-
-# \## Database
-
-# 
-
-# \### Main Table
-
-# 
-
-# `billing\_transactions`
-
-# 
-
-# \### Important Fields
-
-# 
-
-# \* `external\_transaction\_id`
-
-# \* `customer\_id`
-
-# \* `invoice\_id`
-
-# \* `amount`
-
-# \* `currency`
-
-# \* `status`
-
-# \* `transaction\_date`
-
-# \* `source\_system`
-
-# \* `created\_at`
-
-# \* `updated\_at`
-
-# 
-
-# `external\_transaction\_id` is used as the idempotency key to prevent duplicate migrations.
-
-# 
-
-# \## Reliability
-
-# 
-
-# The pipeline is designed around common data-migration reliability requirements:
-
-# 
-
-# \* Input validation before database migration
-
-# \* Duplicate detection
-
-# \* Idempotent migration
-
-# \* Database transaction handling
-
-# \* Rollback on migration failure
-
-# \* Migration reconciliation
-
-# \* Automated test coverage
-
-# \* Containerized execution
-
-# 
-
-# \## Testing
-
-# 
-
-# Run the test suite with:
-
-# 
-
-# ```bash
-
-# pytest -v
-
-# ```
-
-# 
-
-# Run code-quality checks:
-
-# 
-
-# ```bash
-
-# ruff check .
-
-# black --check .
-
-# ```
-
-# 
-
-# \## Docker
-
-# 
-
-# Build and start the application:
-
-# 
-
-# ```bash
-
-# docker compose up --build
-
-# ```
-
-# 
-
-# Stop the containers:
-
-# 
-
-# ```bash
-
-# docker compose down
-
-# ```
-
-# 
-
-# View application logs:
-
-# 
-
-# ```bash
-
-# docker compose logs app
-
-# ```
-
-# 
-
-# \## GitHub Actions
-
-# 
-
-# The CI workflow validates the project by running automated checks such as:
-
-# 
-
-# \* Dependency installation
-
-# \* Ruff
-
-# \* Black
-
-# \* Python compilation checks
-
-# \* pytest
-
-# \* Docker image build
-
-# 
-
-# The current workflow is \*\*CI\*\*, not a production deployment pipeline.
-
-# 
-
-# \## Cloud / Infrastructure Roadmap
-
-# 
-
-# The repository is structured so that cloud infrastructure can be added later.
-
-# 
-
-# Planned improvements include:
-
-# 
-
-# 1\. Azure application deployment
-
-# 2\. Terraform infrastructure
-
-# 3\. Cloud database configuration
-
-# 4\. Application monitoring and metrics
-
-# 5\. Production deployment workflow
-
-# 6\. Additional security hardening
-
-# 
-
-# These capabilities are not presented as completed features until they are implemented and tested.
-
-# 
-
-# \## Future Improvements
-
-# 
-
-# \* Add database migrations with Alembic
-
-# \* Add API authentication and authorization
-
-# \* Add request/batch size limits
-
-# \* Improve health and readiness checks
-
-# \* Add application metrics
-
-# \* Add structured production logging
-
-# \* Add cloud deployment
-
-# \* Add Terraform infrastructure
-
-# \* Add production CD workflow
-
-# 
-
-# \## Project Goal
-
-# 
-
-# The project demonstrates practical backend and cloud-oriented engineering concepts including:
-
-# 
-
-# \* REST API development
-
-# \* Data validation
-
-# \* ETL-style processing
-
-# \* Database migration
-
-# \* Idempotency
-
-# \* Transaction management
-
-# \* Reliability testing
-
-# \* Docker
-
-# \* CI automation
-
-# \* Infrastructure-as-Code preparation
-
-
-
+LinkedIn: `https://linkedin.com/in/swapnil-pawar-a2907a326/`
