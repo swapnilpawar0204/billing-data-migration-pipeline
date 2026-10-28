@@ -8,6 +8,7 @@ services:
     environment:
       API_BASE_URL: ${API_BASE_URL:-https://example.com/api/billing}
       API_KEY: ${API_KEY:-}
+      SERVICE_API_KEY: ${SERVICE_API_KEY:-}
       APP_ENV: ${APP_ENV:-docker}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       MYSQL_HOST: mysql

@@ -10,7 +10,6 @@ __pycache__
 .coverage
 htmlcov
 tests
-data
 docs
 terraform
 docker-compose.yml

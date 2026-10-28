@@ -14,7 +14,11 @@ DATABASE_URL = URL.create(
     database=settings.mysql_database,
 )
 
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,
+    pool_recycle=1800,  # recycle before MySQL's wait_timeout drops idle connections
+)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 

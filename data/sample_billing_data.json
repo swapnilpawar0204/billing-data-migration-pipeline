@@ -1,1 +1,63 @@
-[]
+{
+  "transactions": [
+    {
+      "external_transaction_id": "TXN-1001",
+      "customer_id": "CUST-001",
+      "invoice_id": "INV-5001",
+      "amount": "125.50",
+      "currency": "usd",
+      "status": "PAID",
+      "transaction_date": "2026-09-23T08:00:00Z",
+      "source_system": "legacy-billing"
+    },
+    {
+      "external_transaction_id": "TXN-1002",
+      "customer_id": "CUST-002",
+      "invoice_id": "INV-5002",
+      "amount": "89.99",
+      "currency": "EUR",
+      "status": "pending",
+      "transaction_date": "2026-09-24T10:30:00+05:30",
+      "source_system": "legacy-billing"
+    },
+    {
+      "external_transaction_id": "TXN-1003",
+      "customer_id": "CUST-003",
+      "invoice_id": null,
+      "amount": "0.00",
+      "currency": "INR",
+      "status": "Refunded",
+      "transaction_date": "2026-09-25T00:00:00Z",
+      "source_system": "legacy-billing"
+    },
+    {
+      "external_transaction_id": "TXN-1001",
+      "customer_id": "CUST-001",
+      "invoice_id": "INV-5001",
+      "amount": "125.50",
+      "currency": "USD",
+      "status": "paid",
+      "transaction_date": "2026-09-23T08:00:00Z",
+      "source_system": "legacy-billing"
+    },
+    {
+      "external_transaction_id": "TXN-1004",
+      "customer_id": "CUST-004",
+      "invoice_id": "INV-5004",
+      "amount": "-40.00",
+      "currency": "USD",
+      "status": "paid",
+      "transaction_date": "2026-09-26T09:00:00Z",
+      "source_system": "legacy-billing"
+    },
+    {
+      "external_transaction_id": "TXN-1005",
+      "customer_id": "",
+      "invoice_id": "INV-5005",
+      "amount": "not-a-number",
+      "currency": "USD",
+      "status": "paid",
+      "source_system": "legacy-billing"
+    }
+  ]
+}

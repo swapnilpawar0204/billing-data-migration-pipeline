@@ -1,5 +1,6 @@
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+from datetime import UTC
 
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
@@ -48,8 +49,31 @@ class MigrationError(RuntimeError):
         self.result = result
 
 
+_ID_LOOKUP_CHUNK = 500
+
+
 def _to_model(record: BillingTransactionSchema) -> BillingTransaction:
-    return BillingTransaction(**record.model_dump())
+    values = record.model_dump()
+    moment = values["transaction_date"]
+    if moment is not None and moment.tzinfo is not None:
+        # MySQL DATETIME is timezone-naive: store everything as UTC.
+        values["transaction_date"] = moment.astimezone(UTC).replace(tzinfo=None)
+    return BillingTransaction(**values)
+
+
+def _existing_ids(session: Session, ids: list[str]) -> set[str]:
+    """Look up already-migrated IDs in chunks to keep IN() lists small."""
+    found: set[str] = set()
+    for start in range(0, len(ids), _ID_LOOKUP_CHUNK):
+        chunk = ids[start : start + _ID_LOOKUP_CHUNK]
+        found.update(
+            session.scalars(
+                select(BillingTransaction.external_transaction_id).where(
+                    BillingTransaction.external_transaction_id.in_(chunk)
+                )
+            )
+        )
+    return found
 
 
 def migrate_transactions(
@@ -67,17 +91,15 @@ def migrate_transactions(
 
     current_external_id: str | None = None
     try:
+        # Close any transaction left open by earlier reads on this session so the
+        # whole batch below is one atomic unit (commit all or roll back all).
+        if session.in_transaction():
+            session.commit()
+
         with session.begin():
-            existing_ids = set(
-                session.scalars(
-                    select(BillingTransaction.external_transaction_id).where(
-                        BillingTransaction.external_transaction_id.in_(
-                            [record.external_transaction_id for record in records]
-                        )
-                    )
-                )
+            seen_ids = _existing_ids(
+                session, [record.external_transaction_id for record in records]
             )
-            seen_ids = set(existing_ids)
 
             for record in records:
                 external_id = record.external_transaction_id
@@ -93,11 +115,12 @@ def migrate_transactions(
                 result.inserted += 1
                 result.migrated_external_transaction_ids.append(external_id)
     except SQLAlchemyError as exc:
-        session.rollback()
         failure = MigrationFailure(
             external_transaction_id=current_external_id,
             reason="database migration failed; transaction rolled back",
         )
+        # Nothing was committed: every non-duplicate record counts as failed.
+        result.inserted = 0
         result.failed = result.received - result.skipped_duplicates
         result.failures.append(failure)
         logger.error("Migration failed and was rolled back")

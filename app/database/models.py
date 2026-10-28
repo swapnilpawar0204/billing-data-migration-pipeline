@@ -1,15 +1,15 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
-
-
-def utc_now() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
-
 
 from sqlalchemy import DateTime, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database.connection import Base
+
+
+def utc_now() -> datetime:
+    """Naive UTC timestamp (MySQL DATETIME has no timezone)."""
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 class BillingTransaction(Base):

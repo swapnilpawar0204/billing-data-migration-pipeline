@@ -13,6 +13,7 @@ from app.api.schemas import (
     TransactionStatusResponse,
     ValidationResponse,
 )
+from app.api.security import require_api_key
 from app.config.settings import settings
 from app.database.connection import get_db
 from app.database.models import BillingTransaction
@@ -25,7 +26,11 @@ from app.transformation.transformer import transform_transactions
 from app.validation.validators import ValidationResult, validate_transactions
 
 router = APIRouter()
-migration_router = APIRouter(prefix="/api/v1/migration", tags=["migration"])
+migration_router = APIRouter(
+    prefix="/api/v1/migration",
+    tags=["migration"],
+    dependencies=[Depends(require_api_key)],
+)
 db_session_dependency = Depends(get_db)
 
 
@@ -47,7 +52,7 @@ def _validation_response(
 
 
 @router.get("/health", summary="Check application health")
-async def health_check() -> dict[str, str]:
+def health_check() -> dict[str, str]:
     """Return application and database health status."""
     if not check_database():
         raise HTTPException(

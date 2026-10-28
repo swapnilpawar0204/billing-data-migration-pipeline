@@ -1,184 +1,165 @@
 # Billing Data Migration Pipeline
 
-A containerized REST API for validating, transforming, migrating, and reconciling billing transactions using Python, FastAPI, and MySQL.
+[![CI](https://github.com/swapnilpawar0204/billing-data-migration-pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/swapnilpawar0204/billing-data-migration-pipeline/actions/workflows/ci.yml)
 
-Built to demonstrate reliable data processing, idempotent operations, automated testing, containerization, and CI/CD practices relevant to Cloud Engineering and Site Reliability Engineering.
+A Python service for validating, normalizing, migrating, and reconciling billing transactions. It exposes a FastAPI REST API, uses SQLAlchemy with MySQL, supports a CLI for JSON files or a source API, and runs in Docker Compose.
 
-## Project Overview
+> **Project status:** portfolio / learning project. It demonstrates several reliability patterns, but it is not a production-certified financial system. Cloud deployment, metrics/alerting, rate limiting, TLS termination, and managed schema migrations are not included.
 
-Data migration systems must handle duplicate records, invalid inputs, database errors, and inconsistent transaction counts without silently corrupting data.
+## What it demonstrates
 
-This project implements a structured billing migration workflow with validation, duplicate detection, database transactions, and reconciliation checks.
+- **Idempotency:** `external_transaction_id` is the business key; repeated IDs are skipped and a database uniqueness constraint provides a final guard.
+- **Atomic writes:** a migration batch is committed as one database transaction; database errors roll the batch back.
+- **Data quality:** invalid records are rejected with reasons rather than silently discarded.
+- **Safe money handling:** amounts use `Decimal` and a `NUMERIC(18,2)` database column, not binary floating point.
+- **Reconciliation:** expected transaction IDs are checked against the target database after migration.
+- **Resilient source calls:** the HTTP client retries timeouts, connection errors, HTTP 429, and HTTP 5xx responses with bounded exponential backoff.
+- **Operational basics:** health endpoint, request correlation IDs, structured logs, API-key protection, container health checks, and CI checks.
 
-**Engineering goals**
-- Process billing transactions through a clear, testable pipeline.
-- Prevent duplicate processing using transaction identifiers.
-- Reject invalid financial data before migration.
-- Support consistent database operations and rollback on failures.
-- Verify migration results through reconciliation.
-- Automate code quality checks and tests using GitHub Actions.
+See [architecture](docs/architecture.md), [security notes](docs/security.md), [operations runbook](docs/operations-runbook.md), and [SRE interview guide](docs/sre-interview-guide.md).
 
 ## Architecture
 
 ```mermaid
-flowchart TD
-    A[Client] --> B[FastAPI REST API]
-    B --> C[Request Validation]
-    C --> D[Ingestion]
-    D --> E[Transformation]
-    E --> F[Duplicate and Idempotency Checks]
-    F --> G[MySQL Database]
-    G --> H[Reconciliation]
-    H --> I[Migration Result]
-    B --> J[Health Endpoint]
-    K[GitHub Actions] --> L[Linting and Tests]
-    L --> M[Docker Image Build]
+flowchart LR
+    SRC[JSON file or source API] --> ING[Ingestion and bounded retries]
+    CLIENT[API client] -->|X-API-Key| API[FastAPI]
+    ING --> VAL[Validation]
+    API --> VAL
+    VAL -->|valid records| TR[Transformation]
+    VAL -->|invalid records + reasons| REJ[Rejected-record report]
+    TR --> MIG[Atomic, idempotent migration]
+    MIG --> DB[(MySQL)]
+    MIG --> REC[Reconciliation]
+    REC --> OUT[Summary and status]
 ```
 
-## Technology Stack
+## Quick start with Docker Compose
 
-| Area | Technologies |
-|---|---|
-| Programming | Python |
-| API | FastAPI, REST |
-| Database | MySQL, SQLAlchemy |
-| Containers | Docker, Docker Compose |
-| CI/CD | GitHub Actions |
-| Testing | pytest |
-| Code Quality | Ruff, Black |
-| Version Control | Git, GitHub |
+Requirements: Docker Desktop with Compose enabled.
 
-## Key Features
-
-### 1. Structured data migration
-Processes billing data through ingestion, validation, transformation, migration, and reconciliation stages.
-
-### 2. Idempotency and duplicate detection
-Uses `external_transaction_id` to help prevent the same transaction from being processed repeatedly.
-
-### 3. Input validation
-Rejects invalid transaction data, including negative transaction amounts where prohibited by the application's validation rules.
-
-### 4. Transaction safety
-Uses database transaction handling and rollback to help preserve data consistency when a migration operation fails.
-
-### 5. Reconciliation
-Checks migration results so discrepancies between expected and migrated data can be identified.
-
-### 6. API health checks
-Provides a health endpoint designed to check application status and database connectivity separately from the core migration workflow.
-
-### 7. Automated CI/CD checks
-GitHub Actions runs configured code-quality checks, Python compilation checks, automated tests, and a Docker image build.
-
-## Getting Started
-
-### Prerequisites
-
-- Git
-- Docker
-- Docker Compose
-
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/swapnilpawar0204/billing-data-migration-pipeline.git
-cd billing-data-migration-pipeline
-```
-
-### 2. Start the application
-
-Use the Docker Compose configuration provided in the repository:
+1. Copy `.env.example` to `.env`.
+2. Set unique local values for `MYSQL_PASSWORD` and `MYSQL_ROOT_PASSWORD`.
+3. Set a strong `SERVICE_API_KEY` and set `APP_ENV=production` for a container run so the app refuses to start without the required secrets. Keep real credentials out of Git.
+4. Start the services:
 
 ```bash
 docker compose up --build -d
-```
-
-### 3. Check container status
-
-```bash
 docker compose ps
-docker compose logs
+docker compose logs -f app
 ```
 
-### 4. Check the API
-
-If the API is configured to listen on port 8000:
+Check health and open the interactive API documentation:
 
 ```bash
 curl http://localhost:8000/health
+# http://localhost:8000/docs
 ```
 
-Open the interactive API documentation if enabled:
-
-http://localhost:8000/docs
-
-The exact endpoint response and available API routes depend on the current implementation.
-
-### 5. Run the automated tests
-
-Run tests using the project's configured Python environment and dependencies:
+Run a small migration (replace `YOUR_SERVICE_API_KEY` with the value in `.env`):
 
 ```bash
-pytest
+curl -X POST http://localhost:8000/api/v1/migration/run \
+  -H "X-API-Key: YOUR_SERVICE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"transactions":[{"external_transaction_id":"TXN-1","customer_id":"C-1","amount":"10.00","currency":"usd","status":"PAID"}]}'
 ```
 
-For a containerized test workflow, follow the commands documented in the repository's Docker and Compose configuration.
+Stop the containers with `docker compose down`. To also delete the local MySQL volume and its data, use `docker compose down -v` (destructive).
 
-## Reliability and Operations
+## Local development on Windows
 
-This project explores practical reliability concepts:
+Use PowerShell from the repository directory. Python 3.12 is the version used by CI; create and activate a virtual environment:
 
-- **Idempotency:** reduce duplicate processing during retries.
-- **Data integrity:** validate inputs and reconcile migration results.
-- **Failure handling:** use transaction rollback where appropriate.
-- **Health checks:** identify application and database connectivity problems.
-- **Automated verification:** run tests and quality checks in CI.
-- **Reproducible environments:** use Docker and Docker Compose.
-- **Troubleshooting:** inspect application and container logs to investigate failures.
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install -r requirements-dev.txt
+```
 
-These practices are useful foundations for production reliability engineering. The project is a learning and demonstration environment, not a claim of production deployment.
+Run tests and quality checks:
 
-## CI/CD Workflow
+```powershell
+pytest -q --cov
+ruff check .
+black --check .
+python -m compileall -q app tests scripts
+```
 
-The configured GitHub Actions workflow performs checks such as:
+The tests use SQLite test databases and do not require a running MySQL server, but runtime dependencies still need to be installed. If PowerShell blocks activation, use `\.venv\Scripts\python.exe -m pytest -q --cov` or follow your organization's execution-policy guidance rather than changing system policy blindly.
 
-1. Set up the Python environment.
-2. Run configured linting and formatting checks.
-3. Compile Python source files.
-4. Execute automated tests.
-5. Build the Docker image.
+Linux/macOS equivalent activation is `source .venv/bin/activate`.
 
-Refer to the workflow files in `.github/workflows/` for the exact steps and configuration.
+## API endpoints
 
-## Current Scope
+| Method | Path | Authentication | Purpose |
+|---|---|---|---|
+| `GET` | `/health` | None | Checks database connectivity; returns `503` when the database is unavailable. |
+| `POST` | `/api/v1/migration/validate` | `X-API-Key` when configured | Validates and transforms up to 1,000 records without writing. |
+| `POST` | `/api/v1/migration/run` | `X-API-Key` when configured | Validates, transforms, migrates, and reconciles a batch. |
+| `GET` | `/api/v1/migration/status/{external_transaction_id}` | `X-API-Key` when configured | Looks up the target status for one external transaction ID. |
 
-Implemented project capabilities include the migration API, MySQL integration, validation, idempotency-related checks, reconciliation, Docker Compose, automated tests, and CI checks.
+Responses include an `X-Request-ID`. A printable client-supplied ID is echoed (limited to 64 characters); otherwise the service generates one. Use it to correlate a request with application logs.
 
-Cloud deployment to GCP, AWS, or Azure is not claimed as implemented.
+## CLI examples
 
-Prometheus/Grafana monitoring, production alerting, Kubernetes deployment, and disaster recovery automation should be added and verified before being listed as implemented capabilities.
+```bash
+# Read bundled JSON data
+python -m app.cli --file data/sample_billing_data.json
 
-## Future Improvements
+# Fetch raw records from the configured source API
+python -m app.cli --from-api
+```
 
-- Add Prometheus metrics for request rate, latency, and error rate.
-- Build Grafana dashboards and configure actionable alerts.
-- Add structured logs and request correlation IDs.
-- Test recovery from database and application failures.
-- Document backup, restore, and disaster recovery procedures.
-- Explore deployment to Google Cloud Platform.
-- Add deployment health checks and rollback strategies.
+The CLI prints a JSON summary with counts such as `received`, `rejected`, `inserted`, `skipped_duplicates`, and `reconciled`. Rejected records are written to `data/rejected_records.json` by default; this file may contain sensitive source data and is ignored by Git.
 
-## Learning Outcomes
+Exit codes: `0` = reconciliation succeeded, `1` = reconciliation mismatch, `2` = source/database or execution failure. The bundled sample is intended to demonstrate accepted, duplicate, and rejected records; check the actual CLI summary rather than assuming every database starts empty.
 
-This project provides hands-on practice with REST APIs, relational databases, data validation, failure handling, Docker, automated testing, and CI/CD.
+## Configuration
 
-It is intended to demonstrate foundational skills relevant to Cloud Engineering, DevOps, and Site Reliability Engineering.
+| Variable | Purpose |
+|---|---|
+| `APP_ENV` | `development` for local work; set `production` in a secured deployment to enforce required secrets. |
+| `SERVICE_API_KEY` | Inbound API key expected in the `X-API-Key` header. Empty disables API-key authentication, so only use that for isolated local development. |
+| `API_BASE_URL`, `API_KEY` | External billing source URL and optional bearer token. |
+| `API_TIMEOUT_SECONDS`, `API_MAX_RETRIES` | Source request timeout and bounded retry count. |
+| `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD` | Target database connection settings. |
+| `MYSQL_ROOT_PASSWORD` | MySQL root password required by Compose initialization. |
+| `LOG_LEVEL` | `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL`. |
+
+See `.env.example` for the full list. Never commit `.env` or paste credentials into logs, issues, or interview materials.
+
+## Repository map
+
+```text
+app/
+  api/             FastAPI routes, schemas, API-key authentication
+  config/          environment-based settings and validation
+  database/        SQLAlchemy engine and ORM models
+  ingestion/       source API client, timeouts and retries
+  validation/      validation rules and rejection reasons
+  transformation/  normalization and monetary precision
+  migration/       atomic insert and idempotency handling
+  reconciliation/  post-migration verification
+  monitoring/      database connectivity health check
+  cli.py           JSON/API command-line entry point
+docs/              architecture, security, operations and interview notes
+tests/             unit and integration-style tests using SQLite
+sql/queries.sql    reporting and reconciliation examples
+```
+
+## Known limitations / next steps
+
+- The database schema is created with SQLAlchemy `create_all`; use Alembic for controlled schema evolution.
+- API-key auth is a single shared key; rate limiting, per-client credentials, and TLS termination should be provided by a gateway in a deployed environment.
+- There is no cloud deployment, infrastructure-as-code, metrics endpoint, dashboard, or alerting configuration in this repository.
+- Retry backoff has no jitter and the client is a simple GET integration; production ingestion should define source pagination, rate-limit policy, and replay semantics.
+- Reconciliation is an application-level verification, not an independent financial ledger/audit certification.
+- Verify tests and coverage in your own environment before quoting a coverage percentage. The test files currently contain **83 test functions** by static count; the exact collected test count and coverage can vary with parametrized cases and dependency versions.
 
 ## Author
 
-**Swapnil Pawar**
+**Swapnil Pawar** — [GitHub](https://github.com/swapnilpawar0204) · [LinkedIn](https://www.linkedin.com/in/swapnil-pawar-a2907a326/)
 
-- GitHub: https://github.com/swapnilpawar0204
-- LinkedIn: https://www.linkedin.com/in/swapnil-pawar-a2907a326/
-
+Licensed under [LICENSE](LICENSE).

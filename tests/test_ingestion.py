@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import httpx
@@ -34,9 +34,7 @@ def test_fetch_transactions_returns_validated_transactions() -> None:
 
     assert transactions[0].external_transaction_id == "txn-001"
     assert transactions[0].amount == Decimal("125.50")
-    assert transactions[0].transaction_date == datetime(
-        2026, 9, 23, 8, 0, tzinfo=timezone.utc
-    )
+    assert transactions[0].transaction_date == datetime(2026, 9, 23, 8, 0, tzinfo=UTC)
     client.close()
 
 

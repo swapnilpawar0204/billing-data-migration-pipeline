@@ -1,9 +1,13 @@
 from collections.abc import Iterable, Mapping
+from decimal import Decimal
 from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
 from app.ingestion.schemas import BillingTransactionSchema
+
+# The amount column is NUMERIC(18, 2): at most 16 integer digits.
+MAX_AMOUNT = Decimal("10") ** 16
 
 
 class RejectedRecord(BaseModel):
@@ -76,6 +80,8 @@ def validate_transactions(
                 reasons.append("amount must be finite")
             elif validated.amount < 0:
                 reasons.append("amount must be non-negative")
+            elif validated.amount >= MAX_AMOUNT - Decimal("0.005"):  # after rounding
+                reasons.append("amount exceeds the maximum supported value")
 
         if reasons:
             rejected_records.append(

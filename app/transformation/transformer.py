@@ -1,6 +1,9 @@
 from collections.abc import Iterable
+from decimal import ROUND_HALF_EVEN, Decimal
 
 from app.ingestion.schemas import BillingTransactionSchema
+
+_CENT = Decimal("0.01")
 
 
 def transform_transaction(
@@ -16,6 +19,9 @@ def transform_transaction(
     ):
         values[field_name] = values[field_name].strip()
 
+    # Match the NUMERIC(18, 2) column explicitly (banker's rounding) rather than
+    # letting the database silently round or truncate.
+    values["amount"] = values["amount"].quantize(_CENT, rounding=ROUND_HALF_EVEN)
     values["currency"] = values["currency"].upper()
     values["status"] = values["status"].lower()
 
